@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>demo</title>
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">	
+		<script src="js/signals.min.js"></script>
+		<script src="js/snap.svg-min.js"></script>
+		<script src="js/zoom_font_editor.js?v=1.0"></script>
+		<style type="text/css">			
+			html 
+			{
+				background-color:#D8D8D8; 
+			}
+			
+			*
+			{
+				touch-action:none; 
+			}
+
+			*:not(input)
+			{
+				user-select:none;
+			}
+			
+			#resetButton
+			{
+				position:absolute;
+				top:10px;
+				right:10px;
+			}
+			
+			#ui 
+			{
+				position:absolute;
+				left:0;
+				top:0;
+				bottom:0;
+				width:300px;
+				background:white;
+				z-index:2;
+				overflow:auto;
+			}
+			
+			#textTools, #commonTools
+			{
+				padding:10px;
+			}
+			
+			#svgContainer
+			{
+				position:absolute;
+				left:301px;
+				right:0;
+				top:0;
+				bottom:0;
+				overflow:hidden;
+				user-select:none;
+			}
+			
+			#svgContainer svg
+			{
+				position:absolute;
+				left:0;
+				top:0;
+				user-select:none;
+			}
+			
+			#svgContainer svg > * 
+			{
+				pointer-events:none;
+			}
+			
+			.hidden 
+			{
+				display:none;
+			}
+			
+			.textShadowControls
+			{
+				outline:1px solid #CCC;
+				background-color:#F3F3F3;
+				display:block;
+				padding:10px;
+				margin-top:10px;
+			}
+
+		</style>
+	</head>
+	<body>
+		<div id="svgContainer">
+		</div>
+		<button id="resetButton">Reset</button>
+		<div id="ui">
+			<div id="textTools" class="hidden">					
+				<input type="text" id="textInput" />
+				<button id="textRemoveButton">Delete</button><br />
+				Text Length: <span id="textLength"></span><br />
+				Max Chars <input type="number" id="textMaxChars" value="0" min="0" max="100" /><br />
+				Font Size <input type="number" id="textFontSizeInput" value="24" min="12" max="192" />
+				<input type="range" id="textFontSizeRange" value="24" min="12" max="192" step="1" />
+				<br />
+				Font Family 
+				<select id="textFontFamily">
+				</select><br />
+				Opacity <input type="range" id="textOpacity" value="1" min="0" max="1" step="0.01" />
+				<hr />
+				Fill 
+				<select id="textFillType">
+					<option data-type="solid"  data-controls="#textSolidFill">Solid</option>
+					<option data-type="linear" data-controls="#textLinearFill">Linear Gradient</option>
+					<option data-type="radial" data-controls="#textRadialFill">Radial Gradient</option>
+				</select>
+				<div id="textSolidFill" class="hidden">
+					Color <input class="color1" type="color"></input>
+				</div>
+				<div id="textLinearFill" class="hidden">
+					Color 1 <input class="color1" type="color"></input><br />
+					Color 2 <input class="color2" type="color"></input><br />
+					Rotation <input id="textLinearFillRotation" min="-180" max="180" value="0" type="range"></input>
+				</div>
+				<div id="textRadialFill" class="hidden">
+					Color 1 <input class="color1" type="color"></input><br />
+					Color 2 <input class="color2" type="color"></input>
+				</div>
+				
+				<hr />
+				Shadow <!--<input id="textShadowEnabled" type="checkbox" />--><br />
+				<!--<div id="textShadow">
+					Color <input id="textShadowColor" type="color"></input><br />
+					Blur <input id="textShadowBlur" min="0" max="16" value="0" type="range"></input><br />
+					Rotation <input id="textShadowRotation" min="-180" max="180" step="15" value="0" type="range"></input><br />
+					Distance <input id="textShadowDistance" min="0" max="32" value="0" type="range"></input><br />
+					Opacity <input id="textShadowOpacity" min="0" max="1" step="0.01" value="1" type="range"></input><br />
+				</div>-->
+				<div id="textShadowList">
+				</div><br />
+				<button id="addTextShadowButton">Add Shadow</button>
+			</div>
+			<div id="commonTools" class="hidden">
+				<button id="textLineAddButton">Create Text Line</button><br /><br />
+				<button id="textOnCircleAddButton">Create Text on Circle</button><br /><br />
+				<br />
+				<button id="exportButton">To JSON</button><br />
+			</div>
+		</div>
+		<script type="text/javascript">
+			const UI = ( { domContainer, editor, fontList } ) =>  
+			{
+				const events =
+				{
+					addTextLineRequested:new signals.Signal(),
+					addTextOnCircleRequested:new signals.Signal(),
+					exportRequested:new signals.Signal(),
+				};
+				
+				const resetButton = document.querySelector( '#resetButton' );
+				const commonTools = document.querySelector( '#commonTools' );
+				const textLineAddButton = document.querySelector( '#textLineAddButton' );
+				const textOnCircleAddButton = document.querySelector( '#textOnCircleAddButton' );
+				const exportButton = document.querySelector( '#exportButton' );
+				
+				resetButton.onclick = () => editor.resetView();
+				textLineAddButton.onclick = () => events.addTextLineRequested.dispatch();
+				textOnCircleAddButton.onclick = () => events.addTextOnCircleRequested.dispatch();
+				exportButton.onclick = () => events.exportRequested.dispatch();
+
+				const textTools = document.querySelector( '#textTools' );
+					const textRemoveButton = document.querySelector( '#textRemoveButton' );
+					const textInput = document.querySelector( '#textInput' );
+					const textLength = document.querySelector( '#textLength' );
+					const textMaxChars = document.querySelector( '#textMaxChars' );
+					const textFontSizeInput = document.querySelector( '#textFontSizeInput' );
+					const textFontSizeRange = document.querySelector( '#textFontSizeRange' );
+					const textFontFamily = document.querySelector( '#textFontFamily' );
+					const textOpacity = document.querySelector( '#textOpacity' );
+					const textFillType = document.querySelector( '#textFillType' );
+					const textSolidFill = document.querySelector( '#textSolidFill' );
+						const textSolidFillColor = textSolidFill.querySelector( '.color1' );
+					const textLinearFill = document.querySelector( '#textLinearFill' );
+						const textLinearFillColor1 = textLinearFill.querySelector( '.color1' );
+						const textLinearFillColor2 = textLinearFill.querySelector( '.color2' );
+						const textLinearFillRotation = document.querySelector( '#textLinearFillRotation' );
+					const textRadialFill = document.querySelector( '#textRadialFill' );
+						const textRadialFillColor1 = textRadialFill.querySelector( '.color1' );
+						const textRadialFillColor2 = textRadialFill.querySelector( '.color2' );
+					
+					const textShadowList = document.querySelector( '#textShadowList' );
+					const addTextShadowButton = document.querySelector( '#addTextShadowButton' );
+
+				fontList.forEach( data => 
+				{
+					const option = document.createElement( 'option' );
+					
+					option.style.fontFamily = data.name;
+					option.innerHTML = data.name;
+					
+					textFontFamily.appendChild( option );
+				} );
+
+				const onElementAttributesChanged = ( uuid ) => 
+				{
+					// TODO: check uuid
+					const attrs = editor.getElementAttributes( uuid );
+					
+					// console.log( attrs );
+					
+					textInput.value = attrs.text;
+					textLength.textContent = attrs.text.length;
+					textMaxChars.value = attrs.maxChars;
+					textFontSizeRange.value = textFontSizeInput.value = attrs.fontSize;
+					
+					for( let i = 0; i < textFontFamily.options.length; i++ )
+					{
+						if( textFontFamily.options[ i ].textContent == attrs.fontFamily )
+						{
+							textFontFamily.selectedIndex = i;
+							break;
+						}
+					}
+					
+					textFontFamily.style.fontFamily = attrs.fontFamily;
+					
+					textOpacity.value = attrs.opacity;
+					
+					let fillControls;
+					
+					for( let i = 0; i < textFillType.options.length; i++ )
+					{
+						const option = textFillType.options[ i ];
+						
+						if( option.dataset.type == attrs.fillType )
+						{
+							fillControls = document.querySelector( option.dataset.controls );
+							fillControls.classList.remove( 'hidden' );
+							
+							textFillType.selectedIndex = i;
+						}
+						else 
+						{
+							document.querySelector( option.dataset.controls ).classList.add( 'hidden' );
+						}
+					}
+					
+					if( fillControls )
+					{
+						const color1Input = fillControls.querySelector( '.color1' );
+						const color2Input = fillControls.querySelector( '.color2' );
+						
+						if( color1Input )
+							color1Input.value = attrs.fillColors[ 0 ];
+							
+						if( color2Input )
+							color2Input.value = attrs.fillColors[ 1 ];
+							
+						if( textLinearFillRotation.parentElement == fillControls )
+							textLinearFillRotation.value = attrs.fillRotation;							
+					}
+				};
+				
+				const addShadowControl = ( uuid, shadowUUID ) =>
+				{
+					const textShadowControls = document.createElement( 'div' );
+					
+					textShadowControls.classList.add( 'textShadowControls' );
+					textShadowControls.dataset.element = uuid; // data-element
+					textShadowControls.dataset.shadow = shadowUUID; // data-shadow
+					textShadowControls.innerHTML =  
+						'Color <input class="textShadowColor" type="color"></input><br />' +
+						'Blur <input class="textShadowBlur" min="0" max="16" value="0" type="range"></input><br />' +
+						'Rotation <input class="textShadowRotation" min="-180" max="180" step="15" value="0" type="range"></input><br />' +
+						'Distance <input class="textShadowDistance" min="0" max="32" value="0" type="range"></input><br />' +
+						'Opacity <input class="textShadowOpacity" min="0" max="1" step="0.01" value="1" type="range"></input><br /><br />' +
+						'<button class="button textShadowDeleteButton">delete</button>' + 
+						'<button class="button textShadowMoveToFrontButton">to front</button>' + 
+						'<button class="button textShadowMoveToBackButton">to back</button>';
+						
+					const textShadowColor = textShadowControls.querySelector( '.textShadowColor' );
+					const textShadowBlur = textShadowControls.querySelector( '.textShadowBlur' );
+					const textShadowRotation = textShadowControls.querySelector( '.textShadowRotation' );
+					const textShadowDistance = textShadowControls.querySelector( '.textShadowDistance' );
+					const textShadowOpacity = textShadowControls.querySelector( '.textShadowOpacity' );
+					const textShadowDeleteButton = textShadowControls.querySelector( '.textShadowDeleteButton' );
+					const textShadowMoveToFrontButton = textShadowControls.querySelector( '.textShadowMoveToFrontButton' );
+					const textShadowMoveToBackButton = textShadowControls.querySelector( '.textShadowMoveToBackButton' );
+					const attrs = editor.getElementShadowAttributes( uuid, shadowUUID );
+					
+					textShadowColor.value = attrs.color;
+					textShadowBlur.value = attrs.blur;
+					textShadowRotation.value = attrs.rotation;
+					textShadowDistance.value = attrs.distance;
+					textShadowOpacity.value = attrs.opacity;
+					
+					textShadowColor.oninput =
+					textShadowColor.onchange = () => editor.setElementShadowAttributes( uuid, shadowUUID, { color:textShadowColor.value } );
+					textShadowBlur.oninput =
+					textShadowBlur.onchange = () => editor.setElementShadowAttributes( uuid, shadowUUID, { blur:textShadowBlur.value } );
+					textShadowRotation.oninput =
+					textShadowRotation.onchange = () => editor.setElementShadowAttributes( uuid, shadowUUID, { rotation:textShadowRotation.value } );
+					textShadowDistance.oninput =
+					textShadowDistance.onchange = () => editor.setElementShadowAttributes( uuid, shadowUUID, { distance:textShadowDistance.value } );
+					textShadowOpacity.oninput =
+					textShadowOpacity.onchange = () => editor.setElementShadowAttributes( uuid, shadowUUID, { opacity:textShadowOpacity.value } );
+					
+					textShadowDeleteButton.onclick = () => editor.removeElementShadow( uuid, shadowUUID );
+					textShadowMoveToFrontButton.onclick = () => editor.moveElementShadowToFront( uuid, shadowUUID );
+					textShadowMoveToBackButton.onclick =  () => editor.moveElementShadowToBack( uuid, shadowUUID );
+					
+					textShadowList.appendChild( textShadowControls );
+				};
+				
+				const removeShadowControl = ( uuid, shadowUUID ) => 
+				{
+					const textShadowControls = textShadowList.querySelector( 'div[data-shadow=' + shadowUUID + ']' );
+					const textShadowColor = textShadowControls.querySelector( '.textShadowColor' );
+					const textShadowBlur = textShadowControls.querySelector( '.textShadowBlur' );
+					const textShadowRotation = textShadowControls.querySelector( '.textShadowRotation' );
+					const textShadowDistance = textShadowControls.querySelector( '.textShadowDistance' );
+					const textShadowOpacity = textShadowControls.querySelector( '.textShadowOpacity' );
+					const textShadowDeleteButton = textShadowControls.querySelector( '.textShadowDeleteButton' );
+					const textShadowMoveToFrontButton = textShadowControls.querySelector( '.textShadowMoveToFrontButton' );
+					const textShadowMoveToBackButton = textShadowControls.querySelector( '.textShadowMoveToBackButton' );
+					
+					textShadowColor.oninput = 
+					textShadowColor.onchange =
+					textShadowBlur.oninput =
+					textShadowBlur.onchange =
+					textShadowRotation.oninput =
+					textShadowRotation.onchange =
+					textShadowDistance.oninput =
+					textShadowDistance.onchange =
+					textShadowOpacity.oninput =
+					textShadowOpacity.onchange = 
+					textShadowDeleteButton.onclick = 
+					textShadowMoveToFrontButton.onclick = 
+					textShadowMoveToBackButton.onclick = null;
+					
+					textShadowControls.remove();
+				};
+				
+				const onElementShadowAttributesChanged = ( uuid, shadowUUID ) => 
+				{
+					// console.log( 'ShadowAttributesChanged:' + shadowUUID );
+					
+					const textShadowControls = textShadowList.querySelector( 'div[data-shadow=' + shadowUUID + ']' );
+					
+					if( textShadowControls )
+					{
+						const textShadowColor = textShadowControls.querySelector( '.textShadowColor' );
+						const textShadowBlur = textShadowControls.querySelector( '.textShadowBlur' );
+						const textShadowRotation = textShadowControls.querySelector( '.textShadowRotation' );
+						const textShadowDistance = textShadowControls.querySelector( '.textShadowDistance' );
+						const textShadowOpacity = textShadowControls.querySelector( '.textShadowOpacity' );
+						const attrs = editor.getElementShadowAttributes( uuid, shadowUUID );
+						
+						textShadowColor.value = attrs.color;
+						textShadowBlur.value = attrs.blur;
+						textShadowRotation.value = attrs.rotation;
+						textShadowDistance.value = attrs.distance;
+						textShadowOpacity.value = attrs.opacity;
+					}
+				};
+				
+				const onElementShadowOrderChanged = ( uuid ) =>
+				{
+					// console.log( 'ShadowOrderChanged' );
+					
+					const shadowUUIDList = editor.getElementShadowUUIDList( uuid );
+					
+					shadowUUIDList.forEach( ( shadowUUID, index ) => 
+					{
+						const textShadowControls = textShadowList.querySelector( 'div[data-shadow=' + shadowUUID + ']' );
+						const textShadowMoveToFrontButton = textShadowControls.querySelector( '.textShadowMoveToFrontButton' );
+						const textShadowMoveToBackButton = textShadowControls.querySelector( '.textShadowMoveToBackButton' );
+						
+						textShadowList.insertBefore( textShadowControls, textShadowList.firstChild );
+						
+						if( ( shadowUUIDList.length > 1 ) && ( index < shadowUUIDList.length - 1 ) )
+							textShadowMoveToFrontButton.classList.remove( 'hidden' );
+						else 
+							textShadowMoveToFrontButton.classList.add( 'hidden' );
+							
+						if( ( shadowUUIDList.length > 1 ) && ( index > 0 ) )
+							textShadowMoveToBackButton.classList.remove( 'hidden' );
+						else 
+							textShadowMoveToBackButton.classList.add( 'hidden' );
+					} );
+				};
+				
+				const onElementShadowAdded = ( uuid, shadowUUID ) => 
+				{
+					// console.log( 'ShadowAdded:' + shadowUUID );	
+					addShadowControl( uuid, shadowUUID );
+				};
+				
+				const onElementShadowRemoved = ( uuid, shadowUUID ) => 
+				{
+					// console.log( 'ShadowRemoved:' + shadowUUID );
+					removeShadowControl( uuid, shadowUUID );
+				};
+
+				editor.events.elementSelected.add( uuid => 
+				{ 
+					commonTools.classList.add( 'hidden' );
+					
+					textTools.classList.remove( 'hidden' );
+					
+					textRemoveButton.onclick = () => editor.removeElement( uuid );
+					textInput.oninput = textInput.onchange = () => editor.setElementAttributes( uuid, { text:textInput.value } );
+
+					textMaxChars.onchange = () => 
+					{
+						const min = textMaxChars.min;
+						const max = textMaxChars.max;
+						const maxChars = Math.max( Math.min( textMaxChars.value, max ), min );
+						
+						editor.setElementAttributes( uuid, { maxChars } );
+					};
+
+					textFontSizeInput.onchange = () =>  
+					{	
+						const min = textFontSizeInput.min;
+						const max = textFontSizeInput.max;
+						const fontSize = Math.max( Math.min( textFontSizeInput.value, max ), min );
+						
+						textFontSizeRange.value = fontSize;
+						
+						editor.setElementAttributes( uuid, { fontSize } ); 
+					};
+					
+					textFontSizeRange.oninput = () => 
+					{
+						const fontSize = textFontSizeRange.value;
+						
+						textFontSizeInput.value = fontSize;
+						
+						editor.setElementAttributes( uuid, { fontSize } );
+					};
+					
+					textFontFamily.onchange = () => 
+					{
+						const fontFamily = textFontFamily.options[ textFontFamily.selectedIndex ].textContent;
+						
+						editor.setElementAttributes( uuid, { fontFamily } );
+						textFontFamily.style.fontFamily = fontFamily;
+					};
+					
+					textFillType.onchange = () => editor.setElementAttributes( uuid, { fillType:textFillType.options[ textFillType.selectedIndex ].dataset.type } );
+					
+					textOpacity.onchange = textOpacity.oninput = () =>
+					{		
+						//console.log( textOpacity.value );
+						editor.setElementAttributes( uuid, { opacity:textOpacity.value } );
+					};
+					
+					textSolidFillColor.oninput = 
+					textSolidFillColor.onchange = () => editor.setElementAttributes( uuid, { fillColors:[ textSolidFillColor.value ] } );
+					textLinearFillColor1.oninput = 
+					textLinearFillColor1.onchange = 
+					textLinearFillColor2.oninput = 
+					textLinearFillColor2.onchange = () => editor.setElementAttributes( uuid, { fillColors:[ textLinearFillColor1.value, textLinearFillColor2.value ] } );
+					textLinearFillRotation.oninput =
+					textLinearFillRotation.onchange = () => editor.setElementAttributes( uuid, { fillRotation:[ textLinearFillRotation.value ] } );
+					textRadialFillColor1.oninput =
+					textRadialFillColor1.onchange = 
+					textRadialFillColor2.oninput =
+					textRadialFillColor2.onchange = () => editor.setElementAttributes( uuid, { fillColors:[ textRadialFillColor1.value, textRadialFillColor2.value ] } );
+					
+					addTextShadowButton.onclick = () => editor.addElementShadow( uuid );
+
+					onElementAttributesChanged( uuid );
+					
+					editor.events.elementAttributesChanged.add( onElementAttributesChanged );
+					editor.events.shadowAttributesChanged.add( onElementShadowAttributesChanged );
+					editor.events.shadowOrderChanged.add( onElementShadowOrderChanged );
+					editor.events.shadowAdded.add( onElementShadowAdded );
+					editor.events.shadowRemoved.add( onElementShadowRemoved );
+					
+					const shadowUUIDList = editor.getElementShadowUUIDList( uuid );
+					
+					shadowUUIDList.forEach( shadowUUID => addShadowControl( uuid, shadowUUID ) );
+					
+					onElementShadowOrderChanged( uuid );
+				} );
+				
+				editor.events.elementDeselected.add( uuid => 
+				{ 
+					commonTools.classList.remove( 'hidden' );
+					
+					textTools.classList.add( 'hidden' );
+					
+					textRemoveButton.onclick = 
+					textInput.oninput = textInput.onchange = 
+					textMaxChars.onchange = 
+					textFontSizeInput.onchange = 
+					textFontSizeRange.oninput =
+					textFontFamily.onchange = 
+					textFillType.onchange = 
+					textOpacity.onchange =
+					textOpacity.oninput =
+					textSolidFillColor.onchange = 
+					textLinearFillColor1.onchange = 
+					textLinearFillColor2.onchange = 
+					textRadialFillColor1.onchange = 
+					textRadialFillColor2.onchange = 
+					textSolidFillColor.oninput = 
+					textLinearFillColor1.oninput = 
+					textLinearFillColor2.oninput = 
+					textLinearFillRotation.oninput =
+					textLinearFillRotation.onchange =
+					textRadialFillColor1.oninput = 
+					textRadialFillColor2.oninput = null;
+					
+					addTextShadowButton.onclick = null;
+
+					editor.events.elementAttributesChanged.remove( onElementAttributesChanged );
+					editor.events.shadowAttributesChanged.remove( onElementShadowAttributesChanged );
+					editor.events.shadowOrderChanged.remove( onElementShadowOrderChanged );
+					editor.events.shadowAdded.remove( onElementShadowAdded );
+					editor.events.shadowRemoved.remove( onElementShadowRemoved );
+					
+					const shadowUUIDList = editor.getElementShadowUUIDList( uuid );
+					
+					shadowUUIDList.forEach( shadowUUID => removeShadowControl( uuid, shadowUUID ) );
+				} );
+				
+				editor.events.loaded.add( () => commonTools.classList.remove( 'hidden' ) );
+				
+				return {
+					events,
+				};
+			};
+			
+			const init = ( fontList ) => 
+			{
+				/*const editor = Editor
+				( { 
+					domContainer:document.querySelector( '#svgContainer' ), 
+					backgroundURL:'image.jpg' 
+				} );*/
+				
+				const editor = Editor
+				( { 
+					domContainer:document.querySelector( '#svgContainer' ), 
+					fontList,
+					json:'{"backgroundURL":"demo.png","objects":[{"type":"textLine","text":"14","maxChars":2,"fontSize":186,"fontFamily":"RockSalt","opacity":"0.6","fillType":"solid","fillRotation":-90,"fillColors":["#933e06"],"textWidth":298.41395302876253,"fontURL":"fonts/RockSalt-Regular.ttf","fontType":"application/x-font-ttf","transform":"t434.8081,448.2419r-0.2636,0,0","shadows":[{"blur":0,"color":"#510b1c","distance":4,"rotation":60,"opacity":0.74},{"blur":0,"color":"#ffffff","distance":3,"rotation":-150,"opacity":1}]},{"type":"textOnCircle","text":"Saint Valentine","maxChars":0,"fontSize":42,"fontFamily":"Telegraf Bold","opacity":1,"fillType":"solid","fillRotation":-90,"fillColors":["#ffffff"],"radius":321.7870230170333,"arcLength":90,"fontURL":"fonts/Telegraf-UltraBold.ttf","fontType":"application/x-font-ttf","transform":"t445.4102,475.2757r2.0802,0,0s1.0001,1.0001,0,0","shadows":[{"blur":0,"color":"#1a1005","distance":7,"rotation":0,"opacity":0.5},{"blur":0,"color":"#f5ed0a","distance":6,"rotation":-135,"opacity":0.5}]},{"type":"textLine","text":"Février","maxChars":0,"fontSize":95,"fontFamily":"Satisfy","opacity":1,"fillType":"solid","fillRotation":-90,"fillColors":["#ddbe69"],"textWidth":210.234375,"fontURL":"fonts/Satisfy-Regular.ttf","fontType":"application/x-font-ttf","transform":"t449,664","shadows":[{"blur":6,"color":"#000000","distance":8,"rotation":45,"opacity":0.5}]}]}' 
+				} );
+				
+				const ui = UI( { domContainer:document.querySelector( '#ui' ), editor, fontList } );
+				
+				ui.events.addTextLineRequested.add( () => editor.addTextLine( 'texte', editor.width() / 2, editor.height() / 2 ) );
+				ui.events.addTextOnCircleRequested.add( () => editor.addTextOnCircle( 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456', editor.width() / 2, editor.height() / 2, 150 ) ); // tÄjMe
+				ui.events.exportRequested.add( () => console.log( editor.toJSON() ) );
+			};
+			
+			window.onload = () =>
+			{
+				console.clear();  
+				
+				// *.otf - font/opentype
+				// *.woff - application/font-woff
+				// *.ttf - application/x-font-ttf
+				
+				const fontList = 
+				[
+					
+					{ name:'Roboto Bold', url:'fonts/Roboto-Bold.ttf', type:'application/x-font-ttf' },
+					{ name:'Roboto Regular', url:'fonts/Roboto-Regular.ttf', type:'application/x-font-ttf' },
+					{ name:'RockSalt', url:'fonts/RockSalt-Regular.ttf', type:'application/x-font-ttf' },
+					{ name:'Satisfy', url:'fonts/Satisfy-Regular.ttf', type:'application/x-font-ttf' },
+					{ name:'Telegraf Regular', url:'fonts/Telegraf-Regular.ttf', type:'application/x-font-ttf' },
+					{ name:'Telegraf Bold', url:'fonts/Telegraf-UltraBold.ttf', type:'application/x-font-ttf' },
+					{ name:'Licorice', url:'fonts/Licorice-Regular.ttf', type:'application/x-font-ttf' },
+					{ name:'Mango Scribble', url:'fonts/mango-scribble.scribble-regular.otf', type:'font/opentype' },
+				];
+				
+				let loaded = 0;
+				let total = 0; 
+				
+				fontList.forEach( fontObject => 
+				{
+					total++;
+					
+					fetch( fontObject.url ).then( response => 
+					{
+						response.arrayBuffer().then( buffer => 
+						{
+							const reader = new FileReader();
+							
+							reader.onload = () => 
+							{
+								fontObject.dataURL = reader.result;
+								
+								new FontFace( fontObject.name, 'url("' + fontObject.dataURL + '")' ).load().then( font => 
+								{
+									fontObject.font = font;
+									document.fonts.add( font );
+
+									if( ++loaded == total ) 
+										init( fontList );												
+								} );	
+							};
+							reader.onerror = () => console.error( reader.error );
+							reader.readAsDataURL( new Blob( [ buffer ], { type:fontObject.type } ) );
+						
+						} ).catch( error => console.error( error ) );
+						
+					} ).catch( error => console.error( error ) );
+				} );
+			};
+		</script>
+	</body>
+</html>

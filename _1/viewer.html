@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>petanque</title>
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">	
+		<script src="js/signals.min.js"></script>
+		<script src="js/snap.svg-min.js"></script>
+		<script src="js/viewer.js"></script>
+		<style type="text/css">			
+			html 
+			{
+				background-color:#D8D8D8; 
+			}
+			
+			*
+			{
+				touch-action:none; 
+			}
+
+			*:not(input)
+			{
+				user-select:none;
+			}
+			
+			#ui 
+			{
+				padding:10px;
+			}
+			
+			#svgContainer svg > * 
+			{
+				pointer-events:none;
+			}
+
+		</style>
+	</head>
+	<body>	
+		<div id="ui"></div>
+		<div id="svgContainer"></div>
+		<script type="text/javascript">
+			window.onload = () =>
+			{
+				console.clear(); 
+
+				const viewer = Viewer
+				( { 
+					domContainer:document.querySelector( '#svgContainer' ), 
+					json:'{"backgroundURL":"image2.jpg","objects":[{"type":"textOnCircle","text":"ABCDEFGHIJKLMNOPQRSTUVWXYZ123456","maxChars":0,"fontSize":48,"fontFamily":"Courier New","fillType":"linear","fillRotation":-90,"fillColors":["#ffffff","#fbff00"],"shadowEnabled":false,"shadowBlur":2,"shadowDistance":8,"shadowRotation":45,"shadowColor":"#000000","shadowOpacity":0.5,"radius":150,"arcLength":174.26309735779964,"transform":"t473,160r63.5887,0,0"},{"type":"textLine","text":"345","maxChars":3,"fontSize":192,"fontFamily":"Times New Roman","fillType":"radial","fillRotation":-90,"fillColors":["#ff0000","#6a4c0b"],"shadowEnabled":false,"shadowBlur":2,"shadowDistance":8,"shadowRotation":45,"shadowColor":"#000000","shadowOpacity":0.5,"textWidth":391,"transform":"t231.9859,324.9933r-0.8709,0,0"},{"type":"textOnCircle","text":"ABCDEFGHIJKLMNOPQRSTUVWXYZ123456","maxChars":0,"fontSize":48,"fontFamily":"Times New Roman","fillType":"solid","fillRotation":-90,"fillColors":["#ffffff"],"shadowEnabled":true,"shadowBlur":9,"shadowDistance":8,"shadowRotation":45,"shadowColor":"#9e1010","shadowOpacity":0.92,"radius":450,"arcLength":350,"transform":"t632.0465,-87.3607r213.0099,0,0"}]}' 
+				} );
+				
+				viewer.events.loaded.add( () => 
+				{
+					const ui = document.querySelector( '#ui' );
+					
+					for( let i = 0; i < viewer.length(); i++ )
+					{
+						const attrs = viewer.getAttributesAt( i );
+						const textInput = document.createElement( 'input' );
+						
+						if( attrs.maxChars > 0 )
+							textInput.setAttribute( 'maxlength', attrs.maxChars );
+							
+						textInput.setAttribute( 'value', attrs.text );
+						
+						textInput.onchange = textInput.oninput = () =>
+						{
+							viewer.setTextAt( i, textInput.value );
+						};
+						
+						ui.appendChild( textInput );
+						ui.appendChild( document.createElement( 'br' ) );
+					}
+					
+				} );				
+			};
+		</script>
+	</body>
+</html>

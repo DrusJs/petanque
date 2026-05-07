@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>petanque</title>
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">	
+		<script src="js/signals.min.js"></script>
+		<script src="js/snap.svg-min.js"></script>
+		<script src="js/outline_viewer.js"></script>
+		<style type="text/css">			
+			html 
+			{
+				background-color:#D8D8D8; 
+			}
+			
+			*
+			{
+				touch-action:none; 
+			}
+
+			*:not(input)
+			{
+				user-select:none;
+			}
+			
+			#ui 
+			{
+				padding:10px;
+			}
+			
+			#svgContainer
+			{
+				position:absolute;
+				top:-9999px;
+				left:-9999px;
+			}
+			
+			#svgContainer svg > * 
+			{
+				pointer-events:none;
+			}
+
+		</style>
+	</head>
+	<body>	
+		<div id="ui"></div>
+		<div id="svgContainer"></div>
+		<script type="text/javascript">
+			window.onload = () =>
+			{
+				console.clear();  
+
+				const viewer = Viewer
+				( { 
+					domContainer:document.querySelector( '#svgContainer' ), 
+					json:'{"backgroundURL":"image2.jpg","objects":[{"type":"textLine","text":"345","maxChars":9,"fontSize":192,"fontFamily":"Telegraf Bold","opacity":"0.73","fillType":"radial","fillRotation":-90,"fillColors":["#ff0000","#6a4c0b"],"strokeColor":"#ffffff","strokeWidth":"20","textWidth":391,"fontURL":"fonts/Telegraf-UltraBold.ttf","fontType":"application/x-font-ttf","transform":"t335.2523,259.8542r20.6586,0,0","shadows":[{"blur":8,"color":"#ad2b00","distance":24,"rotation":45,"opacity":0.75},{"blur":5,"color":"#e62d2d","distance":12,"rotation":-150,"opacity":1}]},{"type":"textOnCircle","text":"Hello Hello My Friend","maxChars":0,"fontSize":48,"fontFamily":"Satisfy","opacity":1,"fillType":"linear","fillRotation":-90,"fillColors":["#ffffff","#fbff00"],"strokeColor":"#ffffff","strokeWidth":0,"radius":150,"arcLength":174.26309735779964,"fontURL":"fonts/Satisfy-Regular.ttf","fontType":"application/x-font-ttf","transform":"t534,185r80.3691,0,0","shadows":[]},{"type":"textOnCircle","text":"Hello Hello My Friend","maxChars":0,"fontSize":48,"fontFamily":"Licorice","opacity":1,"fillType":"solid","fillRotation":-90,"fillColors":["#ffffff"],"strokeColor":"#ffffff","strokeWidth":0,"radius":122.8077538353802,"arcLength":303.3090874917242,"fontURL":"fonts/Licorice-Regular.ttf","fontType":"application/x-font-ttf","transform":"t163.0465,258.6393r225.3119,0,0s1.0001,1.0001,0,0","shadows":[{"blur":0,"color":"#00ffd5","distance":8,"rotation":-180,"opacity":0.5},{"blur":0,"color":"#f50a0a","distance":8,"rotation":45,"opacity":0.5},{"blur":0,"color":"#ffd500","distance":28,"rotation":180,"opacity":0.5}]}]}' 
+				} ); 
+				
+				viewer.events.loaded.add( () => 
+				{
+					const ui = document.querySelector( '#ui' );
+					
+					const image = new Image();
+					const width = image.width = viewer.width();
+					const height = image.height = viewer.height();	
+
+					document.body.appendChild( image ); 
+					
+					// 
+					
+					let busy = false;
+					
+					const queue = [];
+					const drawToImage = () => 
+					{
+						if( busy )
+							return;
+							
+						busy = true;
+						
+						viewer.toDataURL( dataURL => 
+						{
+							image.src = dataURL;
+							busy = false;
+							
+							if( queue.length )
+							{
+								// console.log( 'setFromQueue' );	
+								for( let i = queue.length - 1; i >= 0; i-- )
+									viewer.setTextAt( queue[ i ].index, queue[ i ].text );
+								
+								queue.length = 0;
+								
+								drawToImage();
+							}
+						} );
+					};
+					
+					const setTextAt = ( index, text ) =>
+					{
+						if( !busy )
+						{
+							viewer.setTextAt( index, text );
+							drawToImage();
+						}
+						else 
+						{
+							// console.log( 'addToQueue' );
+							let data = queue.filter( data => data.index == index )[ 0 ];
+							
+							if( data == null )	
+								queue.push( { index:index, text:text } );
+							else 
+								data.text = text;
+						}
+					};
+										
+					for( let i = 0; i < viewer.length(); i++ )
+					{
+						const attrs = viewer.getAttributesAt( i );
+						const textInput = document.createElement( 'input' );
+						
+						if( attrs.maxChars > 0 )
+							textInput.setAttribute( 'maxlength', attrs.maxChars );
+							
+						textInput.setAttribute( 'value', attrs.text );
+						textInput.onchange = textInput.oninput = () => setTextAt( i, textInput.value );
+
+						ui.appendChild( textInput );
+						ui.appendChild( document.createElement( 'br' ) );
+					}
+					
+					drawToImage();					
+				} );				
+			};
+		</script>
+	</body>
+</html>
